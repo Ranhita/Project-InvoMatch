@@ -280,7 +280,7 @@ http://localhost:5173
 
 # 👥 Team Members
 
-- **Ranhita Bhuvanagiri**
+- **Ranhita B**
 - **Keerthana S**
 
 ---
