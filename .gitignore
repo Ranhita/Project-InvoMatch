@@ -1,0 +1,28 @@
+# Python virtual environment and dependencies
+backend/venv/
+backend/.env
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Node.js dependencies and builds
+frontend/node_modules/
+frontend/dist/
+frontend/local.env
+
+# Database and state files
+database/*.db
+database/*.db-journal
+
+# Uploads and temporary files
+uploads/
+test_uploads/
+test_files/
+logs/
+
+# IDE files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
