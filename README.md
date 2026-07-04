@@ -1,306 +1,105 @@
-# 🚀 InvoMatch - AI-Assisted Invoice Reconciliation & Anomaly Detection
+# InvoMatch - AI-Assisted Invoice Reconciliation Engine
 
-## 📖 Overview
+InvoMatch is an AI-powered accounts payable invoice verification platform that automatically matches invoices with purchase orders, detects pricing/quantity discrepancies, and flags potential anomalies.
 
-**InvoMatch** is an AI-powered invoice reconciliation system that automates the Accounts Payable (AP) process by matching vendor invoices with Purchase Orders (POs), identifying anomalies, and assisting finance teams in making accurate payment decisions.
-
-The system combines business rules, fuzzy matching, and machine learning techniques to reduce manual effort, improve accuracy, and minimize payment fraud.
+This repository contains the complete implementation for **Phase 1 (Project Setup & Auth)** and **Phase 2 (Invoice Upload Module)**.
 
 ---
 
-# ✨ Features
+## Folder Structure
 
-- 🔐 User Authentication (Register/Login using JWT)
-- 📄 Upload Vendor Invoices
-- 📑 Upload Purchase Orders
-- 🤖 AI-Based Invoice Matching
-- 🔍 Fuzzy Vendor & Product Matching
-- ⚠️ Price & Quantity Anomaly Detection
-- 📊 Dashboard for Invoice Review
-- 📈 Match Confidence Scoring
-- 📝 Audit Logging
-- 📋 Report Generation
-
----
-
-# 🏗️ System Architecture
-
-```
-                React Frontend
-                      │
-               REST API Requests
-                      │
-                FastAPI Backend
-                      │
- ┌────────────────────────────────────┐
- │ Invoice Upload                     │
- │ Data Parsing                       │
- │ Data Cleaning                      │
- │ Feature Engineering                │
- │ Matching Engine                    │
- │ Anomaly Detection                  │
- │ Report Generation                  │
- └────────────────────────────────────┘
-                      │
-              PostgreSQL Database
-```
-
----
-
-# 🧠 AI Workflow
-
-```
-Invoice Upload
-       │
-       ▼
-Data Parsing
-       │
-       ▼
-Data Cleaning
-       │
-       ▼
-Feature Engineering
-       │
-       ▼
-Invoice Matching
-       │
-       ▼
-Anomaly Detection
-       │
-       ▼
-Dashboard & Reports
-```
-
----
-
-# 🛠️ Tech Stack
-
-## Frontend
-
-- React.js
-- Vite
-- Tailwind CSS
-- Axios
-
-## Backend
-
-- Python
-- FastAPI
-- SQLAlchemy
-- JWT Authentication
-
-## Database
-
-- PostgreSQL
-
-## Machine Learning
-
-- LightGBM
-- Scikit-learn
-- Isolation Forest
-- RapidFuzz
-- SHAP
-- Pandas
-- NumPy
-
----
-
-# 📂 Project Structure
-
-```
+```text
 InvoMatch/
-
-│── backend/
+├── backend/
 │   ├── app/
-│   ├── requirements.txt
-│   ├── verify_backend.py
-│
-│── frontend/
+│   │   ├── __init__.py
+│   │   ├── auth.py         # JWT and password encryption handlers
+│   │   ├── config.py       # Pydantic settings management
+│   │   ├── database.py     # SQLAlchemy DB session setup
+│   │   ├── main.py         # FastAPI main routing
+│   │   ├── models.py       # SQL models (Users, Invoices, POs, etc.)
+│   │   ├── schemas.py      # Request/Response validation schemas
+│   │   └── upload.py       # Upload endpoints (duplicate checks, limits)
+│   ├── .env                # App settings
+│   ├── requirements.txt    # Python library requirements
+│   └── venv/               # Virtual environment
+├── frontend/
 │   ├── src/
+│   │   ├── components/
 │   │   ├── context/
+│   │   │   └── AuthContext.jsx # JWT state manager
 │   │   ├── pages/
-│   │   ├── App.jsx
-│   │   ├── main.jsx
-│   │   └── index.css
+│   │   │   ├── Login.jsx       # Login layout
+│   │   │   ├── Register.jsx    # Registration layout
+│   │   │   └── Dashboard.jsx   # Drag & Drop uploader and upload log
+│   │   ├── App.jsx             # Router and auth guards
+│   │   ├── index.css           # Styling directives and background meshes
+│   │   └── main.jsx
+│   ├── index.html
 │   ├── package.json
-│   ├── vite.config.js
-│   └── tailwind.config.js
-│
-│── database/
-│
-│── uploads/
-│
-│── test_uploads/
-│
-│── test_files/
-│
-│── logs/
-│
-│── README.md
-│── .gitignore
-│── test_app.py
-│── start_production.ps1
+│   ├── postcss.config.js
+│   ├── tailwind.config.js
+│   └── vite.config.js
+├── database/
+│   ├── invomatch.db        # Auto-created local SQLite database
+│   └── schema.sql          # Base database SQL scripts
+├── uploads/
+│   ├── invoices/           # Uploaded invoices directory
+│   └── pos/                # Uploaded purchase orders directory
+├── verify_backend.py       # Syntax and load sanity checker script
+└── test_app.py             # Full end-to-end API test suite
 ```
 
 ---
 
-# 🚀 Getting Started
+## Getting Started
 
-## 1. Clone the Repository
+### 1. Backend Setup & Run
+
+The backend is configured to use a local virtual environment and auto-create the database using SQLite on startup, meaning no separate database installation or Docker is required.
+
+1. Navigate to the `backend/` directory:
+   ```bash
+   cd backend
+   ```
+
+2. Make sure you are using Python 3.10+ and start the server:
+   ```bash
+   .\venv\Scripts\uvicorn app.main:app --reload
+   ```
+   *The server will start at [http://localhost:8000](http://localhost:8000).*
+
+3. You can access the auto-generated Swagger API documentation at:
+   - Interactive docs: [http://localhost:8000/docs](http://localhost:8000/docs)
+   - Alternative docs: [http://localhost:8000/redoc](http://localhost:8000/redoc)
+
+### 2. Run API Verification Tests
+
+A comprehensive suite of API test cases is included in the project root:
 
 ```bash
-git clone https://github.com/<username>/InvoMatch.git
+# Run sanity checks to verify all files load cleanly
+.\backend\venv\Scripts\python.exe verify_backend.py
 
-cd InvoMatch
+# Run functional tests covering register, login, duplicate file checks, and size validation
+.\backend\venv\Scripts\python.exe test_app.py
 ```
 
----
+### 3. Frontend Setup & Run (Requires Node.js)
 
-## 2. Backend Setup
+To run the React + Vite + Tailwind dashboard interface:
 
-```bash
-cd backend
-
-python -m venv venv
-```
-
-### Windows
-
-```bash
-venv\Scripts\activate
-```
-
-### Install Dependencies
-
-```bash
-pip install -r requirements.txt
-```
-
-### Configure Environment Variables
-
-Create a `.env` file inside the `backend` folder.
-
-Example:
-
-```env
-DATABASE_URL=postgresql://username:password@localhost/invomatch
-
-JWT_SECRET_KEY=your_secret_key
-```
-
-### Run Backend
-
-```bash
-uvicorn app.main:app --reload
-```
-
-Backend:
-
-```
-http://localhost:8000
-```
-
-Swagger Documentation:
-
-```
-http://localhost:8000/docs
-```
-
----
-
-## 3. Frontend Setup
-
-```bash
-cd frontend
-
-npm install
-
-npm run dev
-```
-
-Frontend:
-
-```
-http://localhost:5173
-```
-
----
-
-# 📋 Application Modules
-
-### Authentication
-
-- User Registration
-- User Login
-- JWT Authentication
-
-### Invoice Upload
-
-- Upload Vendor Invoices
-- Upload Purchase Orders
-
-### Data Processing
-
-- Data Parsing
-- Data Cleaning
-- Feature Engineering
-
-### AI Matching
-
-- Exact Matching
-- Fuzzy Matching
-- Machine Learning Ranking
-
-### Anomaly Detection
-
-- Price Deviations
-- Quantity Mismatches
-- Duplicate Detection
-
-### Dashboard
-
-- Invoice Summary
-- Pending Reviews
-- Match Statistics
-- Reports
-
----
-
-# 📊 Future Enhancements
-
-- OCR Support for Scanned PDFs
-- Email Notifications
-- Vendor Performance Analytics
-- Multi-Currency Support
-- Multi-Tenant Architecture
-- Cloud Deployment
-- ERP Integration (SAP, Oracle, QuickBooks)
-
----
-
-# 👥 Team Members
-
-- **Ranhita B**
-- **Keerthana S**
-
----
-
-# 🎯 Project Objectives
-
-- Reduce manual invoice reconciliation time.
-- Improve invoice matching accuracy.
-- Detect fraudulent or duplicate invoices.
-- Assist finance teams with faster decision-making.
-- Automate Accounts Payable workflows.
-
----
-
-# 📄 License
-
-This project was developed as an academic Final Year Project for learning and demonstration purposes.
-
----
-
-## ⭐ Support
-
-If you found this project useful, consider giving it a ⭐ on GitHub!
+1. Download and install **Node.js** (LTS version recommended) from [nodejs.org](https://nodejs.org/).
+2. Navigate to the `frontend/` directory:
+   ```bash
+   cd frontend
+   ```
+3. Install the dependencies:
+   ```bash
+   npm install
+   ```
+4. Run the development server:
+   ```bash
+   npm run dev
+   ```
+   *The interface will launch at [http://localhost:5173](http://localhost:5173) with requests to `/api` proxying automatically to your local backend.*
