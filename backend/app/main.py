@@ -183,9 +183,9 @@ def get_recent_uploads(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    # Fetch recent invoices and POs
-    invoices = db.query(Invoice).order_by(Invoice.uploaded_at.desc()).limit(10).all()
-    pos = db.query(PurchaseOrder).order_by(PurchaseOrder.uploaded_at.desc()).limit(10).all()
+    # Fetch recent invoices and POs for the logged in user
+    invoices = db.query(Invoice).filter(Invoice.uploaded_by == current_user.id).order_by(Invoice.uploaded_at.desc()).limit(10).all()
+    pos = db.query(PurchaseOrder).filter(PurchaseOrder.uploaded_by == current_user.id).order_by(PurchaseOrder.uploaded_at.desc()).limit(10).all()
 
     documents = []
     
@@ -234,9 +234,9 @@ def get_document_lines(
     current_user: User = Depends(get_current_user)
 ):
     if id.startswith("INV-"):
-        doc = db.query(Invoice).filter(Invoice.id == id).first()
+        doc = db.query(Invoice).filter(Invoice.id == id, Invoice.uploaded_by == current_user.id).first()
     elif id.startswith("PO-"):
-        doc = db.query(PurchaseOrder).filter(PurchaseOrder.id == id).first()
+        doc = db.query(PurchaseOrder).filter(PurchaseOrder.id == id, PurchaseOrder.uploaded_by == current_user.id).first()
     else:
         raise HTTPException(status_code=400, detail="Invalid document ID format.")
         
@@ -266,13 +266,20 @@ def get_document_features(
     # Compute similarity feature vectors (Phase 4)
     if id.startswith("INV-"):
         invoice_id = id
+        inv_check = db.query(Invoice).filter(Invoice.id == invoice_id, Invoice.uploaded_by == current_user.id).first()
+        if not inv_check:
+            raise HTTPException(status_code=404, detail="Invoice not found.")
+            
         if candidate_id:
             if not candidate_id.startswith("PO-"):
                 raise HTTPException(status_code=400, detail="Candidate ID must be a Purchase Order for Invoice comparisons.")
             po_id = candidate_id
+            po_check = db.query(PurchaseOrder).filter(PurchaseOrder.id == po_id, PurchaseOrder.uploaded_by == current_user.id).first()
+            if not po_check:
+                raise HTTPException(status_code=404, detail="Purchase Order not found.")
             return get_document_similarities(db, invoice_id, po_id)
         else:
-            pos = db.query(PurchaseOrder).all()
+            pos = db.query(PurchaseOrder).filter(PurchaseOrder.uploaded_by == current_user.id).all()
             all_similarities = []
             for po in pos:
                 similarities = get_document_similarities(db, invoice_id, po.id)
@@ -282,13 +289,20 @@ def get_document_features(
             
     elif id.startswith("PO-"):
         po_id = id
+        po_check = db.query(PurchaseOrder).filter(PurchaseOrder.id == po_id, PurchaseOrder.uploaded_by == current_user.id).first()
+        if not po_check:
+            raise HTTPException(status_code=404, detail="Purchase Order not found.")
+            
         if candidate_id:
             if not candidate_id.startswith("INV-"):
                 raise HTTPException(status_code=400, detail="Candidate ID must be an Invoice for PO comparisons.")
             invoice_id = candidate_id
+            inv_check = db.query(Invoice).filter(Invoice.id == invoice_id, Invoice.uploaded_by == current_user.id).first()
+            if not inv_check:
+                raise HTTPException(status_code=404, detail="Invoice not found.")
             return get_document_similarities(db, invoice_id, po_id)
         else:
-            invoices = db.query(Invoice).all()
+            invoices = db.query(Invoice).filter(Invoice.uploaded_by == current_user.id).all()
             all_similarities = []
             for inv in invoices:
                 similarities = get_document_similarities(db, inv.id, po_id)
@@ -306,15 +320,15 @@ def reconcile_document(
 ):
     try:
         if invoice_id.startswith("PO-"):
-            po = db.query(PurchaseOrder).filter(PurchaseOrder.id == invoice_id).first()
+            po = db.query(PurchaseOrder).filter(PurchaseOrder.id == invoice_id, PurchaseOrder.uploaded_by == current_user.id).first()
             if not po:
                 raise HTTPException(status_code=404, detail=f"PO {invoice_id} not found.")
             
-            # Find invoices of the same vendor that are processed
-            invoices = db.query(Invoice).filter(Invoice.vendor_name == po.vendor_name).all()
+            # Find invoices of the same vendor that are processed and owned by the user
+            invoices = db.query(Invoice).filter(Invoice.vendor_name == po.vendor_name, Invoice.uploaded_by == current_user.id).all()
             if not invoices:
-                # Fallback to all processed invoices
-                invoices = db.query(Invoice).filter(Invoice.status == "processed").all()
+                # Fallback to all processed invoices owned by the user
+                invoices = db.query(Invoice).filter(Invoice.status == "processed", Invoice.uploaded_by == current_user.id).all()
             
             reconciled_count = 0
             for inv in invoices:
@@ -325,6 +339,10 @@ def reconcile_document(
                     pass
             return {"status": "success", "message": f"PO matched against {reconciled_count} invoices."}
         else:
+            # Check ownership of invoice
+            inv = db.query(Invoice).filter(Invoice.id == invoice_id, Invoice.uploaded_by == current_user.id).first()
+            if not inv:
+                raise HTTPException(status_code=404, detail=f"Invoice {invoice_id} not found.")
             result = reconcile_invoice(db, invoice_id)
             return result
     except ValueError as e:
@@ -337,12 +355,12 @@ def get_matches_list(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    matches = db.query(Match).order_by(Match.created_at.desc()).all()
+    matches = db.query(Match).join(Invoice, Match.invoice_id == Invoice.id).filter(Invoice.uploaded_by == current_user.id).order_by(Match.created_at.desc()).all()
     results = []
     
     for match in matches:
-        inv = db.query(Invoice).filter(Invoice.id == match.invoice_id).first()
-        po = db.query(PurchaseOrder).filter(PurchaseOrder.id == match.po_id).first()
+        inv = db.query(Invoice).filter(Invoice.id == match.invoice_id, Invoice.uploaded_by == current_user.id).first()
+        po = db.query(PurchaseOrder).filter(PurchaseOrder.id == match.po_id, PurchaseOrder.uploaded_by == current_user.id).first()
         flags_count = db.query(Flag).filter(Flag.invoice_id == match.invoice_id).count()
         
         results.append({
@@ -374,7 +392,7 @@ def approve_reconciliation_match(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    match = db.query(Match).filter(Match.id == id).first()
+    match = db.query(Match).join(Invoice, Match.invoice_id == Invoice.id).filter(Match.id == id, Invoice.uploaded_by == current_user.id).first()
     if not match:
         raise HTTPException(status_code=404, detail="Match not found.")
         
@@ -385,11 +403,11 @@ def approve_reconciliation_match(
         match.comment = comment_text
     
     # Update documents statuses to approved
-    inv = db.query(Invoice).filter(Invoice.id == match.invoice_id).first()
+    inv = db.query(Invoice).filter(Invoice.id == match.invoice_id, Invoice.uploaded_by == current_user.id).first()
     if inv:
         inv.status = "approved"
         
-    po = db.query(PurchaseOrder).filter(PurchaseOrder.id == match.po_id).first()
+    po = db.query(PurchaseOrder).filter(PurchaseOrder.id == match.po_id, PurchaseOrder.uploaded_by == current_user.id).first()
     if po:
         po.status = "approved"
         
@@ -488,6 +506,10 @@ def get_document_flags(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    # Verify invoice ownership
+    inv = db.query(Invoice).filter(Invoice.id == id, Invoice.uploaded_by == current_user.id).first()
+    if not inv:
+        raise HTTPException(status_code=404, detail="Invoice not found.")
     flags = db.query(Flag).filter(Flag.invoice_id == id).all()
     results = []
     for f in flags:
@@ -508,9 +530,9 @@ def download_document(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    doc = db.query(Invoice).filter(Invoice.id == id).first()
+    doc = db.query(Invoice).filter(Invoice.id == id, Invoice.uploaded_by == current_user.id).first()
     if not doc:
-        doc = db.query(PurchaseOrder).filter(PurchaseOrder.id == id).first()
+        doc = db.query(PurchaseOrder).filter(PurchaseOrder.id == id, PurchaseOrder.uploaded_by == current_user.id).first()
         
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found.")
@@ -538,7 +560,7 @@ def get_audit_logs(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    logs = db.query(AuditLog).order_by(AuditLog.created_at.desc()).all()
+    logs = db.query(AuditLog).filter(AuditLog.user_id == current_user.id).order_by(AuditLog.created_at.desc()).all()
     results = []
     for log in logs:
         user_obj = db.query(User).filter(User.id == log.user_id).first()
@@ -556,10 +578,10 @@ def get_dashboard_analytics(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    total_invoices = db.query(Invoice).count()
-    total_pos = db.query(PurchaseOrder).count()
+    total_invoices = db.query(Invoice).filter(Invoice.uploaded_by == current_user.id).count()
+    total_pos = db.query(PurchaseOrder).filter(PurchaseOrder.uploaded_by == current_user.id).count()
     
-    matches = db.query(Match).all()
+    matches = db.query(Match).join(Invoice, Match.invoice_id == Invoice.id).filter(Invoice.uploaded_by == current_user.id).all()
     
     matched_count = len([m for m in matches if m.status in ["approved", "matched"]])
     pending_count = len([m for m in matches if m.status == "pending"])
@@ -587,7 +609,7 @@ def get_dashboard_analytics(
     # Since SQLite doesn't guarantee easy date formats across environments,
     # we can construct simple month aggregations programmatically
     monthly_data = {}
-    for inv in db.query(Invoice).all():
+    for inv in db.query(Invoice).filter(Invoice.uploaded_by == current_user.id).all():
         m_str = inv.uploaded_at.strftime("%b %Y") if inv.uploaded_at else "Jun 2026"
         monthly_data[m_str] = monthly_data.get(m_str, 0) + 1
         
