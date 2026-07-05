@@ -103,3 +103,38 @@ To run the React + Vite + Tailwind dashboard interface:
    npm run dev
    ```
    *The interface will launch at [http://localhost:5173](http://localhost:5173) with requests to `/api` proxying automatically to your local backend.*
+
+---
+
+## Production Cloud Deployment
+
+This project is configured as a monorepo for seamless cloud deployment. The frontend is hosted on Vercel, the backend is hosted on Render, and data is stored in a Neon serverless PostgreSQL database.
+
+### 1. Database Setup (Neon PostgreSQL)
+1. Create a free account at [Neon](https://neon.tech) and create a new PostgreSQL database.
+2. In the Neon Console main dashboard, copy your database **Connection String** (URI).
+3. The SQLAlchemy models will automatically migrate and initialize all tables in Neon upon backend startup.
+
+### 2. Backend Deployment (Render)
+1. Create a new **Web Service** on [Render](https://render.com).
+2. Connect your GitHub repository.
+3. Configure the deployment settings:
+   - **Branch:** `main`
+   - **Root Directory:** `backend`
+   - **Build Command:** `pip install -r requirements.txt`
+   - **Start Command:** `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+4. Go to the **Environment Variables** tab and add:
+   - `PYTHON_VERSION`: `3.10.13` (ensures pre-compiled binary packages are used)
+   - `DATABASE_URL`: `[Your Neon Connection String]`
+   - `JWT_SECRET_KEY`: `[Your secure 64-character random hex string]`
+5. Click **Create Web Service**.
+
+### 3. Frontend Deployment (Vercel)
+1. Create a new project on [Vercel](https://vercel.com) and import your GitHub repository.
+2. Configure the deployment details:
+   - **Root Directory:** Select the `frontend` directory.
+   - **Framework Preset:** `Vite` (automatically detected).
+3. Expand the **Environment Variables** tab and add:
+   - `VITE_API_URL`: `[Your Render App URL]` (e.g., `https://project-invomatch.onrender.com` - *do not include a trailing slash*).
+4. Click **Deploy**.
+
